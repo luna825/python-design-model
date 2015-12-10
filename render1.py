@@ -6,11 +6,11 @@ import textwrap
 import sys
 #what mean html.escape textwrap collections.ChainMap
 
-class Render(metaclass=abc.ABCMeta):
+class Renderer(metaclass=abc.ABCMeta):
 
     @classmethod
     def __subclasshook__(Class, Subclass):
-        if Class is Subclass:
+        if Class is Renderer:
             attributes = collections.ChainMap(*(Superclass.__dict__
                         for Superclass in Subclass.__mro__))
             methods = ("header", "paragraph", "footer")
@@ -39,21 +39,32 @@ two paragraph in action."
     htmlPage.add_paragraph(paragraph1)
     htmlPage.add_paragraph(paragraph2)
     htmlPage.render()
+    try:
+        page = Page(title, HtmlWriter())
+        page.render()
+        print("ERROR! rendering with an invalid renderer")
+    except TypeError as err:
+        print(err)
 
 
 class Page:
 
-    def __init__(self,title,renderer):
+    def __init__(self, title, renderer):
+        if not isinstance(renderer, Renderer):
+            raise TypeError("Expected object of type Renderer, got {}".
+                    format(type(renderer).__name__))
         self.title = title
         self.renderer = renderer
-        self.paragraph = []
+        self.paragraphs = []
 
-    def add_paragraph(self,paragraph):
-        self.paragraph.append(paragraph)
+
+    def add_paragraph(self, paragraph):
+        self.paragraphs.append(paragraph)
+
 
     def render(self):
         self.renderer.header(self.title)
-        for paragraph in self.paragraph:
+        for paragraph in self.paragraphs:
             self.renderer.paragraph(paragraph)
         self.renderer.footer()
 
@@ -80,41 +91,54 @@ class TextRender:
 
 class HtmlWriter:
 
-    def __init__(self,file=sys.stdout):
+    def __init__(self, file=sys.stdout):
         self.file = file
 
-    def header(self):
-        self.file.write('<!DOCTYPE html>\n<html lang="en">\n')
 
-    def title(self,title):
-        self.file.write('<head>\n<meta charset="UTF-8">\n\
-<title>{}</title>\n</head>\n'.format(escape(title)))
+    def header(self):
+        self.file.write("<!doctype html>\n<html>\n")
+
+
+    def title(self, title):
+        self.file.write("<head><title>{}</title></head>\n".format(
+                escape(title)))
+
     def start_body(self):
-        self.file.write('<body>\n')
-    def body(self,text):
-        self.file.write('<p>{}</p>\n'.format(escape(text)))
+        self.file.write("<body>\n")
+
+
+    def body(self, text):
+        self.file.write("<p>{}</p>\n".format(escape(text)))
+
+
     def end_body(self):
-        self.file.write('</body>\n')
+        self.file.write("</body>\n")
+
+
     def footer(self):
-        self.file.write('</html>\n')
+        self.file.write("</html>\n")
+
 
 class HtmlRender:
 
-    def __init__(self,htmlwriter):
-        self.htmlwriter = htmlwriter
+    def __init__(self, htmlWriter):
+        self.htmlWriter = htmlWriter
 
-    def header(self,title):
-        self.htmlwriter.header()
-        self.htmlwriter.title(title)
 
-    def paragraph(self,text):
-        self.htmlwriter.start_body()
-        self.htmlwriter.body(escape(text))
-        
+    def header(self, title):
+        self.htmlWriter.header()
+        self.htmlWriter.title(title)
+        self.htmlWriter.start_body()
+
+
+    def paragraph(self, text):
+        self.htmlWriter.body(text)
+
 
     def footer(self):
-        self.htmlwriter.end_body()
-        self.htmlwriter.footer()
+        self.htmlWriter.end_body()
+        self.htmlWriter.footer()
+
 
 
 if __name__ == '__main__':
